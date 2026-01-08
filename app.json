@@ -1,19 +1,21 @@
 {
   "expo": {
-    "name": "Water-Reminder-Sleep-Focus",
-    "slug": "Water-Reminder-Sleep-Focus",
+    "name": "HydroMate - Water Reminder & Tracker",
+    "slug": "hydromate-water-reminder",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "waterremindersleepfocus",
+    "scheme": "hydromate",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kyawhla.hydromate"
     },
     "android": {
+      "package": "com.kyawhla.hydromate",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#E1F5FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -33,16 +35,40 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#E1F5FE",
           "dark": {
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#2196F3",
+          "sounds": [],
+          "defaultChannel": "hydromate-reminders"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow HydroMate to use your location to provide weather-based hydration recommendations.",
+          "locationWhenInUsePermission": "Allow HydroMate to use your location to provide weather-based hydration recommendations."
+        }
+      ],
+      "./plugins/withAndroidWidget",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "43ecfa86-7037-4164-ba07-87a70a6813e2"
+      }
     }
   }
 }
