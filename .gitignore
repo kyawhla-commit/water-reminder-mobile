@@ -38,6 +38,18 @@ yarn-error.*
 
 app-example
 
-# generated native folders
-/ios
-/android
+# generated native folders - commented out because we have custom native code
+# /ios
+# /android
+
+# Android build artifacts (keep source, ignore build outputs)
+android/.gradle/
+android/app/build/
+android/build/
+android/.idea/
+android/local.properties
+
+# iOS build artifacts (if added later)
+ios/Pods/
+ios/build/
+ios/.xcode.env.local
