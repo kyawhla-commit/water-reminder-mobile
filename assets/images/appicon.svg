@@ -1,0 +1,31 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bgGrad)"/>
+  
+  <!-- Water Drop -->
+  <path d="M512 160C512 160 320 400 320 592C320 698.039 407.961 784 512 784C616.039 784 704 698.039 704 592C704 400 512 160 512 160Z" fill="url(#dropGrad)"/>
+  
+  <!-- Inner Shine -->
+  <path d="M512 200C512 200 360 400 360 572C360 655.529 428.471 724 512 724" stroke="white" stroke-width="16" stroke-linecap="round" fill="none" opacity="0.4"/>
+  
+  <!-- Wave -->
+  <path d="M380 600C420 580 480 620 512 600C544 580 604 620 644 600" stroke="white" stroke-width="12" stroke-linecap="round" opacity="0.5"/>
+  <path d="M400 660C440 640 490 680 512 660C534 640 584 680 624 660" stroke="white" stroke-width="10" stroke-linecap="round" opacity="0.4"/>
+  
+  <!-- Bubbles -->
+  <circle cx="420" cy="700" r="20" fill="white" opacity="0.35"/>
+  <circle cx="480" cy="740" r="14" fill="white" opacity="0.25"/>
+  <circle cx="560" cy="720" r="16" fill="white" opacity="0.3"/>
+  
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1024" y2="1024">
+      <stop offset="0%" stop-color="#E1F5FE"/>
+      <stop offset="100%" stop-color="#B3E5FC"/>
+    </linearGradient>
+    <linearGradient id="dropGrad" x1="512" y1="160" x2="512" y2="784">
+      <stop offset="0%" stop-color="#4FC3F7"/>
+      <stop offset="40%" stop-color="#29B6F6"/>
+      <stop offset="100%" stop-color="#0277BD"/>
+    </linearGradient>
+  </defs>
+</svg>

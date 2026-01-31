@@ -1,0 +1,30 @@
+# EAS Build ignore file
+
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+
+# Build outputs
+dist/
+dist-test/
+
+# Logs
+*.log
+
+# Git
+.git/
+
+# Large/unnecessary assets
+assets/sounds/originals/
+
+# Android build caches (keep native folder but ignore caches)
+android/.gradle/
+android/app/build/
+android/build/
+android/.idea/
+
+# iOS build caches (if you add iOS later)
+ios/Pods/
+ios/build/

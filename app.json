@@ -10,7 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kyawhla.hydromate"
+      "bundleIdentifier": "com.kyawhla.hydromate",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"],
+        "NSMicrophoneUsageDescription": "This app does not use the microphone."
+      }
     },
     "android": {
       "package": "com.kyawhla.hydromate",
@@ -46,10 +50,7 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#2196F3",
-          "sounds": [
-            "./assets/sounds/water_bubble.wav",
-            "./assets/sounds/liquid_bubble.wav"
-          ],
+          "sounds": ["./assets/sounds/water_bubble.wav", "./assets/sounds/liquid_bubble.wav"],
           "defaultChannel": "hydromate-reminders"
         }
       ],
