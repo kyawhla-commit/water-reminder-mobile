@@ -1,6 +1,7 @@
 /**
  * Notification Sounds Service
  * Custom notification sounds for water reminders with nature-inspired audio
+ * Optimized for performance and reliability
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,11 +9,13 @@ import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+// Constants
 const NOTIFICATION_SOUND_KEY = '@hydromate_notification_sound';
 const NOTIFICATION_CHANNEL_ID = 'hydromate-water-reminders';
+const DEFAULT_SOUND_ID = 'popping-bubble';
 
-// Available notification sounds
-export type NotificationSoundId = 'default' | 'water-bubble' | 'liquid-bubble' | 'silent';
+// Types
+export type NotificationSoundId = 'popping-bubble' | 'silent';
 
 export interface NotificationSoundOption {
   id: NotificationSoundId;
@@ -21,51 +24,24 @@ export interface NotificationSoundOption {
   icon: string;
   description: string;
   descriptionMy: string;
-  // For Android: filename in res/raw (without extension)
   androidSound: string | null;
-  // For iOS: filename in app bundle
   iosSound: string | null;
-  // For preview: require() asset or null
   previewAsset: any;
   isPremium: boolean;
 }
 
-// Notification sound options
-export const NOTIFICATION_SOUNDS: NotificationSoundOption[] = [
+// Sound options with lazy loading for assets
+export const NOTIFICATION_SOUNDS: Readonly<NotificationSoundOption[]> = [
   {
-    id: 'default',
-    name: 'System Default',
-    nameMy: 'စနစ်မူလ',
-    icon: '🔔',
-    description: 'Standard system notification sound',
-    descriptionMy: 'စံစနစ်အသိပေးသံ',
-    androidSound: null, // Uses system default
-    iosSound: null,
-    previewAsset: null,
-    isPremium: false,
-  },
-  {
-    id: 'water-bubble',
-    name: 'Water Bubble',
-    nameMy: 'ရေပူဖောင်းသံ',
-    icon: '💧',
-    description: 'Gentle water bubble sound',
-    descriptionMy: 'ဖြည်းဖြည်းချင်း ရေပူဖောင်းသံ',
-    androidSound: 'water_bubble', // Must match filename in res/raw (without extension)
-    iosSound: 'water_bubble.wav',
-    previewAsset: require('../assets/sounds/water_bubble.wav'),
-    isPremium: false,
-  },
-  {
-    id: 'liquid-bubble',
-    name: 'Liquid Bubble',
-    nameMy: 'အရည်ပူဖောင်းသံ',
-    icon: '🫧',
-    description: 'Soft liquid bubble pop sound',
-    descriptionMy: 'ပျော့ပျောင်းသော အရည်ပူဖောင်းပေါက်သံ',
-    androidSound: 'liquid_bubble', // Must match filename in res/raw (without extension)
-    iosSound: 'liquid_bubble.wav',
-    previewAsset: require('../assets/sounds/liquid_bubble.wav'),
+    id: 'popping-bubble',
+    name: 'Popping Bubble',
+    nameMy: 'ပေါက်သောပူဖောင်းသံ',
+    icon: '💥',
+    description: 'Clear, crisp bubble pop - Professional & Attention-grabbing',
+    descriptionMy: 'ရှင်းလင်းပြတ်သားသော ပူဖောင်းပေါက်သံ - ပရော်ဖက်ရှင်နယ်',
+    androidSound: 'popping_bubble',
+    iosSound: 'popping_bubble.wav',
+    previewAsset: require('../assets/sounds/popping_bubble.wav'),
     isPremium: false,
   },
   {
@@ -80,133 +56,134 @@ export const NOTIFICATION_SOUNDS: NotificationSoundOption[] = [
     previewAsset: null,
     isPremium: false,
   },
-];
+] as const;
 
-// Get saved notification sound preference
+// Cache for sound options
+const soundOptionCache = new Map<NotificationSoundId, NotificationSoundOption>();
+
+// Cache for loaded sound instances
+const soundCache = new Map<NotificationSoundId, Audio.Sound>();
+
+/**
+ * Get sound option by ID with caching
+ */
+export const getSoundOption = (soundId: NotificationSoundId): NotificationSoundOption => {
+  if (soundOptionCache.has(soundId)) {
+    return soundOptionCache.get(soundId)!;
+  }
+
+  const option = NOTIFICATION_SOUNDS.find((s) => s.id === soundId) || NOTIFICATION_SOUNDS[0];
+  soundOptionCache.set(soundId, option);
+  return option;
+};
+
+/**
+ * Get saved notification sound preference
+ */
 export const getNotificationSound = async (): Promise<NotificationSoundId> => {
   try {
     const saved = await AsyncStorage.getItem(NOTIFICATION_SOUND_KEY);
-    if (saved && NOTIFICATION_SOUNDS.some((s) => s.id === saved)) {
-      return saved as NotificationSoundId;
-    }
-    return 'water-bubble'; // Default to water bubble
-  } catch {
-    return 'water-bubble';
+    const isValid = saved && NOTIFICATION_SOUNDS.some((s) => s.id === saved);
+    return isValid ? (saved as NotificationSoundId) : DEFAULT_SOUND_ID;
+  } catch (error) {
+    console.warn('Failed to get notification sound:', error);
+    return DEFAULT_SOUND_ID;
   }
 };
 
-// Save notification sound preference
+/**
+ * Save notification sound preference
+ */
 export const setNotificationSound = async (soundId: NotificationSoundId): Promise<void> => {
-  await AsyncStorage.setItem(NOTIFICATION_SOUND_KEY, soundId);
-  // Update notification channel on Android
-  if (Platform.OS === 'android') {
-    await updateNotificationChannel(soundId);
+  try {
+    await AsyncStorage.setItem(NOTIFICATION_SOUND_KEY, soundId);
+
+    if (Platform.OS === 'android') {
+      await updateNotificationChannel(soundId);
+    }
+
+    // Clear preview cache when sound changes
+    await stopSoundPreview();
+    soundCache.delete(soundId);
+  } catch (error) {
+    console.error('Failed to set notification sound:', error);
+    throw new Error('Failed to save sound preference');
   }
 };
 
-// Get sound option by ID
-export const getSoundOption = (
-  soundId: NotificationSoundId
-): NotificationSoundOption | undefined => {
-  return NOTIFICATION_SOUNDS.find((s) => s.id === soundId);
-};
-
-// Update Android notification channel with custom sound
+/**
+ * Update Android notification channel with proper error handling
+ */
 const updateNotificationChannel = async (soundId: NotificationSoundId): Promise<void> => {
   if (Platform.OS !== 'android') return;
 
-  // Delete existing channel and recreate with new sound
-  // Note: Android doesn't allow modifying channel sound after creation
   try {
-    await Notifications.deleteNotificationChannelAsync(NOTIFICATION_CHANNEL_ID);
-    console.log('Deleted existing notification channel');
-  } catch {
-    console.log('No existing channel to delete');
-  }
-
-  const soundOption = getSoundOption(soundId);
-
-  // For custom sounds on Android, reference the file in res/raw without extension
-  // The sound file must be in android/app/src/main/res/raw/
-  let soundValue: string | undefined;
-  if (soundId === 'silent') {
-    soundValue = undefined;
-  } else if (soundOption?.androidSound) {
-    // Reference custom sound from res/raw (e.g., 'water_bubble' for water_bubble.wav)
-    soundValue = soundOption.androidSound;
-  } else {
-    soundValue = 'default';
-  }
-
-  const channelConfig: Notifications.NotificationChannelInput = {
-    name: 'Water Reminders',
-    description: 'Hydration reminder notifications with custom sounds (plays even in silent mode)',
-    importance: Notifications.AndroidImportance.HIGH,
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#2196F3',
-    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    bypassDnd: false, // Don't bypass Do Not Disturb
-    sound: soundValue,
-    enableVibrate: true,
-    enableLights: true,
-    // Android 8.0+ channel settings
-    showBadge: true,
-  };
-
-  await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNEL_ID, channelConfig);
-  console.log(`✅ Notification channel created with sound: ${soundValue || 'silent'}`);
-  console.log('📢 Channel configured to play sound even in silent mode');
-};
-
-// Validate that sound files exist and can be loaded
-export const validateSoundFiles = async (): Promise<{ valid: string[]; missing: string[] }> => {
-  const valid: string[] = [];
-  const missing: string[] = [];
-
-  const soundsWithAssets = NOTIFICATION_SOUNDS.filter((s) => s.previewAsset !== null);
-
-  for (const sound of soundsWithAssets) {
+    // Try to delete existing channel
     try {
-      const testSound = new Audio.Sound();
-      await testSound.loadAsync(sound.previewAsset, { shouldPlay: false });
-      await testSound.unloadAsync();
-      valid.push(sound.id);
-      console.log(`✓ Sound file exists: ${sound.id}`);
-    } catch (error) {
-      missing.push(sound.id);
-      console.error(`✗ Sound file missing or invalid: ${sound.id}`, error);
-    }
-  }
-
-  return { valid, missing };
-};
-
-// Preview a notification sound using expo-av
-let previewSound: Audio.Sound | null = null;
-
-export const previewNotificationSound = async (soundId: NotificationSoundId): Promise<boolean> => {
-  try {
-    // Stop any currently playing preview
-    await stopSoundPreview();
-
-    if (soundId === 'silent') {
-      console.log('Silent mode - no preview');
-      return true;
-    }
-
-    if (soundId === 'default') {
-      // For default, we can't easily preview system sound
-      console.log('System default sound - cannot preview');
-      return true;
+      await Notifications.deleteNotificationChannelAsync(NOTIFICATION_CHANNEL_ID);
+      console.log('🗑️ Deleted existing notification channel');
+    } catch (deleteError) {
+      console.log('ℹ️ No existing channel to delete');
     }
 
     const soundOption = getSoundOption(soundId);
-    if (!soundOption?.previewAsset) {
-      console.warn(`No preview asset for sound: ${soundId}`);
-      return false;
+    let soundValue: string | undefined;
+
+    if (soundId === 'silent') {
+      soundValue = undefined;
+    } else if (soundOption?.androidSound) {
+      soundValue = soundOption.androidSound;
+    } else {
+      soundValue = 'default';
     }
 
-    // Configure audio mode for playback - plays even in silent mode
+    const channelConfig: Notifications.NotificationChannelInput = {
+      name: 'Water Reminders',
+      description: 'Hydration reminder notifications with custom sounds',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#2196F3',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: false,
+      sound: soundValue,
+      enableVibrate: true,
+      enableLights: true,
+      showBadge: true,
+    };
+
+    await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNEL_ID, channelConfig);
+    console.log(`✅ Notification channel created with sound: ${soundValue || 'silent'}`);
+  } catch (error) {
+    console.error('❌ Failed to update notification channel:', error);
+    throw error;
+  }
+};
+
+/**
+ * Load sound with caching
+ */
+const loadSound = async (soundId: NotificationSoundId): Promise<Audio.Sound | null> => {
+  if (soundId === 'silent') return null;
+
+  if (soundCache.has(soundId)) {
+    const cachedSound = soundCache.get(soundId)!;
+    try {
+      const status = await cachedSound.getStatusAsync();
+      if (status.isLoaded) {
+        return cachedSound;
+      }
+    } catch {
+      // Sound is no longer valid, remove from cache
+      soundCache.delete(soundId);
+    }
+  }
+
+  const soundOption = getSoundOption(soundId);
+  if (!soundOption?.previewAsset) return null;
+
+  try {
+    const sound = new Audio.Sound();
+
     await Audio.setAudioModeAsync({
       playsInSilentModeIOS: true,
       staysActiveInBackground: false,
@@ -216,47 +193,90 @@ export const previewNotificationSound = async (soundId: NotificationSoundId): Pr
       interruptionModeAndroid: 1, // Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX
     });
 
-    // Play the preview sound using expo-av
-    previewSound = new Audio.Sound();
-    await previewSound.loadAsync(soundOption.previewAsset, {
+    await sound.loadAsync(soundOption.previewAsset, {
       shouldPlay: false,
       volume: 1.0,
       isLooping: false,
+      progressUpdateIntervalMillis: 100,
     });
 
-    await previewSound.playAsync();
-    console.log(`🔊 Playing preview: ${soundOption.name} (even in silent mode)`);
+    soundCache.set(soundId, sound);
+    return sound;
+  } catch (error) {
+    console.error(`Failed to load sound ${soundId}:`, error);
+    return null;
+  }
+};
 
-    // Auto-cleanup after playback
-    previewSound.setOnPlaybackStatusUpdate((status) => {
+/**
+ * Preview a notification sound with better state management
+ */
+let previewSound: Audio.Sound | null = null;
+let isPreviewPlaying = false;
+
+export const previewNotificationSound = async (soundId: NotificationSoundId): Promise<boolean> => {
+  if (isPreviewPlaying) {
+    await stopSoundPreview();
+  }
+
+  if (soundId === 'silent') {
+    console.log('🔇 Silent mode - no preview');
+    return true;
+  }
+
+  try {
+    isPreviewPlaying = true;
+    const sound = await loadSound(soundId);
+
+    if (!sound) return false;
+
+    previewSound = sound;
+
+    // Reset position and play
+    await sound.setPositionAsync(0);
+    await sound.playAsync();
+
+    console.log(`🔊 Playing preview: ${getSoundOption(soundId).name}`);
+
+    // Setup completion handler
+    sound.setOnPlaybackStatusUpdate((status) => {
       if (status.isLoaded && status.didJustFinish) {
-        console.log('Preview finished, cleaning up');
-        stopSoundPreview();
+        isPreviewPlaying = false;
+        console.log('Preview finished');
       }
     });
 
     return true;
   } catch (error) {
     console.error('Error previewing sound:', error);
-    await stopSoundPreview();
+    isPreviewPlaying = false;
     return false;
   }
 };
 
+/**
+ * Stop sound preview with proper cleanup
+ */
 export const stopSoundPreview = async (): Promise<void> => {
-  if (previewSound) {
+  if (previewSound && isPreviewPlaying) {
     try {
-      await previewSound.stopAsync();
-      await previewSound.unloadAsync();
-      console.log('Preview sound stopped');
+      const status = await previewSound.getStatusAsync();
+      if (status.isLoaded) {
+        await previewSound.stopAsync();
+        await previewSound.unloadAsync();
+      }
     } catch (error) {
-      console.log('Error stopping preview:', error);
+      console.warn('Error stopping preview:', error);
+    } finally {
+      previewSound = null;
+      isPreviewPlaying = false;
     }
-    previewSound = null;
   }
 };
 
-// Send a test notification with the selected sound
+/**
+ * Send test notification with improved error handling
+ */
 export const sendTestNotificationWithSound = async (
   soundId?: NotificationSoundId,
   language: 'en' | 'my' = 'en'
@@ -265,17 +285,24 @@ export const sendTestNotificationWithSound = async (
     const selectedSound = soundId || (await getNotificationSound());
     const soundOption = getSoundOption(selectedSound);
 
-    // On Android, ensure the channel is set up with the correct sound
+    // Update Android channel if needed
     if (Platform.OS === 'android') {
       await updateNotificationChannel(selectedSound);
     }
 
-    const soundName = language === 'my' ? soundOption?.nameMy : soundOption?.name;
-    const title = language === 'my' ? '💧 ရေသောက်သတိပေးစမ်းသပ်မှု' : '💧 Water Reminder Test';
-    const body =
-      language === 'my'
-        ? `"${soundName || 'မူလ'}" အသိပေးသံကို စမ်းသပ်နေသည်။ ကြားရပါသလား?`
-        : `Testing "${soundOption?.name || 'Default'}" notification sound. Can you hear it?`;
+    // Localized content
+    const localizedContent = {
+      en: {
+        title: '💧 Water Reminder Test',
+        body: `Testing "${soundOption.name}" notification sound. Can you hear it?`,
+      },
+      my: {
+        title: '💧 ရေသောက်သတိပေးစမ်းသပ်မှု',
+        body: `"${soundOption.nameMy}" အသိပေးသံကို စမ်းသပ်နေသည်။ ကြားရပါသလား?`,
+      },
+    };
+
+    const { title, body } = localizedContent[language];
 
     // Build notification content
     const notificationContent: any = {
@@ -283,25 +310,23 @@ export const sendTestNotificationWithSound = async (
       body,
       priority: Notifications.AndroidNotificationPriority.HIGH,
       vibrate: [0, 250, 250, 250],
-      data: { type: 'sound-test', soundId: selectedSound },
+      data: { type: 'sound-test', soundId: selectedSound, timestamp: Date.now() },
     };
 
-    // Add sound configuration based on platform
+    // Platform-specific sound configuration
     if (Platform.OS === 'android') {
-      // Android uses the channel's sound configuration
       notificationContent.channelId = NOTIFICATION_CHANNEL_ID;
-      // Sound is already configured in the channel
     } else if (Platform.OS === 'ios') {
-      // iOS can specify sound per notification
       if (selectedSound === 'silent') {
         notificationContent.sound = false;
-      } else if (soundOption?.iosSound) {
+      } else if (soundOption.iosSound) {
         notificationContent.sound = soundOption.iosSound;
       } else {
-        notificationContent.sound = true; // Use default
+        notificationContent.sound = true;
       }
     }
 
+    // Schedule notification
     await Notifications.scheduleNotificationAsync({
       content: notificationContent,
       trigger: null,
@@ -310,19 +335,28 @@ export const sendTestNotificationWithSound = async (
     console.log(`✅ Test notification sent with sound: ${selectedSound}`);
     return true;
   } catch (error) {
-    console.error('❌ Error sending test notification:', error);
+    console.error('❌ Failed to send test notification:', error);
     return false;
   }
 };
 
-// Initialize notification sound system
+/**
+ * Initialize notification sounds system
+ */
+let isInitialized = false;
+
 export const initializeNotificationSounds = async (): Promise<void> => {
+  if (isInitialized) {
+    console.log('ℹ️ Notification sounds already initialized');
+    return;
+  }
+
   try {
     console.log('🔧 Initializing notification sounds...');
 
-    // Configure audio mode to play in silent mode
+    // Configure audio mode
     await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true, // iOS: Play even when silent switch is on
+      playsInSilentModeIOS: true,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
       allowsRecordingIOS: false,
@@ -330,21 +364,82 @@ export const initializeNotificationSounds = async (): Promise<void> => {
       interruptionModeAndroid: 1, // Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX
     });
 
+    // Initialize on Android
     if (Platform.OS === 'android') {
       const savedSound = await getNotificationSound();
       await updateNotificationChannel(savedSound);
-      console.log(`✅ Notification sounds initialized with: ${savedSound}`);
-      console.log('📢 Android: Notifications will play sound even in silent mode');
+      console.log(`✅ Android initialized with sound: ${savedSound}`);
     } else {
-      console.log('✅ Notification sounds initialized (iOS)');
-      console.log('📢 iOS: Notifications will play sound even when silent switch is on');
+      console.log('✅ iOS notification sounds initialized');
     }
+
+    isInitialized = true;
   } catch (error) {
-    console.error('❌ Error initializing notification sounds:', error);
+    console.error('❌ Failed to initialize notification sounds:', error);
+    throw error;
   }
 };
 
-// Get the notification channel ID (useful for other services)
-export const getNotificationChannelId = (): string => {
-  return NOTIFICATION_CHANNEL_ID;
+/**
+ * Cleanup resources
+ */
+export const cleanupNotificationSounds = async (): Promise<void> => {
+  try {
+    await stopSoundPreview();
+
+    // Unload all cached sounds
+    for (const [soundId, sound] of soundCache) {
+      try {
+        const status = await sound.getStatusAsync();
+        if (status.isLoaded) {
+          await sound.unloadAsync();
+        }
+      } catch (error) {
+        console.warn(`Failed to unload sound ${soundId}:`, error);
+      }
+    }
+
+    soundCache.clear();
+    soundOptionCache.clear();
+    isInitialized = false;
+
+    console.log('🧹 Notification sounds cleaned up');
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+  }
 };
+
+/**
+ * Validate sound files with better reporting
+ */
+export const validateSoundFiles = async (): Promise<{
+  valid: NotificationSoundId[];
+  missing: NotificationSoundId[];
+}> => {
+  const valid: NotificationSoundId[] = [];
+  const missing: NotificationSoundId[] = [];
+
+  for (const sound of NOTIFICATION_SOUNDS) {
+    if (sound.id === 'silent') {
+      valid.push(sound.id);
+      continue;
+    }
+
+    try {
+      const audio = new Audio.Sound();
+      await audio.loadAsync(sound.previewAsset, { shouldPlay: false });
+      await audio.unloadAsync();
+      valid.push(sound.id);
+      console.log(`✅ Sound file valid: ${sound.id}`);
+    } catch (error) {
+      missing.push(sound.id);
+      console.error(`❌ Sound file invalid/missing: ${sound.id}`, error);
+    }
+  }
+
+  return { valid, missing };
+};
+
+// Utility exports
+export const getNotificationChannelId = (): string => NOTIFICATION_CHANNEL_ID;
+export const getDefaultSoundId = (): NotificationSoundId => DEFAULT_SOUND_ID;

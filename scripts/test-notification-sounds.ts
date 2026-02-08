@@ -75,14 +75,14 @@ const testSoundPreference = async () => {
     const currentSound = await getNotificationSound();
     console.log(`   Current sound: ${currentSound}`);
 
-    // Set to water-bubble
-    await setNotificationSound('water-bubble');
+    // Set to popping-bubble
+    await setNotificationSound('popping-bubble');
     const newSound = await getNotificationSound();
 
-    if (newSound === 'water-bubble') {
+    if (newSound === 'popping-bubble') {
       addResult('Sound Preference', true, 'Successfully saved and retrieved sound preference');
     } else {
-      addResult('Sound Preference', false, `Expected 'water-bubble', got '${newSound}'`);
+      addResult('Sound Preference', false, `Expected 'popping-bubble', got '${newSound}'`);
     }
 
     // Restore original
@@ -107,7 +107,7 @@ const testSoundOptions = () => {
       }
 
       // Check that non-silent sounds have preview assets
-      if (sound.id !== 'silent' && sound.id !== 'default' && !sound.previewAsset) {
+      if (sound.id !== 'silent' && !sound.previewAsset) {
         addResult('Sound Options', false, `Sound '${sound.id}' missing preview asset`);
         allValid = false;
       }
@@ -128,8 +128,8 @@ const testSoundOptions = () => {
 // Test 5: Preview functionality
 const testPreview = async () => {
   try {
-    // Test water-bubble preview
-    const success = await previewNotificationSound('water-bubble');
+    // Test popping-bubble preview
+    const success = await previewNotificationSound('popping-bubble');
 
     if (success) {
       // Wait a bit for sound to play
@@ -175,7 +175,7 @@ const testNotificationChannel = async () => {
 // Test 7: Test notification
 const testNotification = async () => {
   try {
-    const success = await sendTestNotificationWithSound('water-bubble', 'en');
+    const success = await sendTestNotificationWithSound('popping-bubble', 'en');
 
     if (success) {
       addResult('Test Notification', true, 'Test notification sent successfully');

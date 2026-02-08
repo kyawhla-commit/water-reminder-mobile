@@ -42,7 +42,7 @@ export default function NotificationsSettingsScreen() {
     null
   );
   const [showSoundPicker, setShowSoundPicker] = useState(false);
-  const [selectedSoundId, setSelectedSoundId] = useState<NotificationSoundId>('water-bubble');
+  const [selectedSoundId, setSelectedSoundId] = useState<NotificationSoundId>('popping-bubble');
 
   useEffect(() => {
     loadSettings();

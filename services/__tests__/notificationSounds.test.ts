@@ -2,15 +2,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
 import {
-    getNotificationSound,
-    getSoundOption,
-    initializeNotificationSounds,
-    NOTIFICATION_SOUNDS,
-    NotificationSoundId,
-    previewNotificationSound,
-    sendTestNotificationWithSound,
-    setNotificationSound,
-    stopSoundPreview,
+  getNotificationSound,
+  getSoundOption,
+  initializeNotificationSounds,
+  NOTIFICATION_SOUNDS,
+  NotificationSoundId,
+  previewNotificationSound,
+  sendTestNotificationWithSound,
+  setNotificationSound,
+  stopSoundPreview,
 } from '../notificationSounds';
 
 // Mock AsyncStorage
@@ -60,12 +60,10 @@ describe('Notification Sounds Service', () => {
       return Promise.resolve(storedData[key] || null);
     });
 
-    (AsyncStorage.setItem as jest.Mock).mockImplementation(
-      (key: string, value: string) => {
-        storedData[key] = value;
-        return Promise.resolve();
-      }
-    );
+    (AsyncStorage.setItem as jest.Mock).mockImplementation((key: string, value: string) => {
+      storedData[key] = value;
+      return Promise.resolve();
+    });
   });
 
   afterEach(() => {
@@ -96,18 +94,18 @@ describe('Notification Sounds Service', () => {
   });
 
   describe('getNotificationSound', () => {
-    it('should return water-bubble as default when no saved preference', async () => {
+    it('should return popping-bubble as default when no saved preference', async () => {
       const sound = await getNotificationSound();
 
-      expect(sound).toBe('water-bubble');
+      expect(sound).toBe('popping-bubble');
     });
 
     it('should return saved sound preference', async () => {
-      storedData['@hydromate_notification_sound'] = 'liquid-bubble';
+      storedData['@hydromate_notification_sound'] = 'popping-bubble';
 
       const sound = await getNotificationSound();
 
-      expect(sound).toBe('liquid-bubble');
+      expect(sound).toBe('popping-bubble');
     });
 
     it('should return default if saved value is invalid', async () => {
@@ -115,22 +113,22 @@ describe('Notification Sounds Service', () => {
 
       const sound = await getNotificationSound();
 
-      expect(sound).toBe('water-bubble');
+      expect(sound).toBe('popping-bubble');
     });
   });
 
   describe('setNotificationSound', () => {
     it('should save sound preference to AsyncStorage', async () => {
-      await setNotificationSound('liquid-bubble');
+      await setNotificationSound('popping-bubble');
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         '@hydromate_notification_sound',
-        'liquid-bubble'
+        'popping-bubble'
       );
     });
 
     it('should update notification channel on Android', async () => {
-      await setNotificationSound('water-bubble');
+      await setNotificationSound('popping-bubble');
 
       expect(Notifications.setNotificationChannelAsync).toHaveBeenCalled();
     });
@@ -138,11 +136,11 @@ describe('Notification Sounds Service', () => {
 
   describe('getSoundOption', () => {
     it('should return sound option by ID', () => {
-      const option = getSoundOption('water-bubble');
+      const option = getSoundOption('popping-bubble');
 
       expect(option).toBeDefined();
-      expect(option?.name).toBe('Water Bubble');
-      expect(option?.icon).toBe('💧');
+      expect(option?.name).toBe('Popping Bubble');
+      expect(option?.icon).toBe('💥');
     });
 
     it('should return undefined for invalid ID', () => {
@@ -152,9 +150,9 @@ describe('Notification Sounds Service', () => {
     });
 
     it('should return correct Myanmar name', () => {
-      const option = getSoundOption('water-bubble');
+      const option = getSoundOption('popping-bubble');
 
-      expect(option?.nameMy).toBe('ရေပူဖောင်းသံ');
+      expect(option?.nameMy).toBe('ပေါက်သောပူဖောင်းသံ');
     });
   });
 
@@ -166,21 +164,8 @@ describe('Notification Sounds Service', () => {
       expect(Audio.Sound.createAsync).not.toHaveBeenCalled();
     });
 
-    it('should return true for default sound without playing', async () => {
-      const result = await previewNotificationSound('default');
-
-      expect(result).toBe(true);
-      expect(Audio.Sound.createAsync).not.toHaveBeenCalled();
-    });
-
-    it('should return true for custom sounds', async () => {
-      const result = await previewNotificationSound('water-bubble');
-
-      expect(result).toBe(true);
-    });
-
-    it('should return true for liquid-bubble', async () => {
-      const result = await previewNotificationSound('liquid-bubble');
+    it('should return true for popping-bubble sound', async () => {
+      const result = await previewNotificationSound('popping-bubble');
 
       expect(result).toBe(true);
     });
@@ -194,43 +179,39 @@ describe('Notification Sounds Service', () => {
 
   describe('sendTestNotificationWithSound', () => {
     it('should send test notification with selected sound', async () => {
-      const result = await sendTestNotificationWithSound('water-bubble', 'en');
+      const result = await sendTestNotificationWithSound('popping-bubble', 'en');
 
       expect(result).toBe(true);
       expect(Notifications.scheduleNotificationAsync).toHaveBeenCalled();
-      const call = (Notifications.scheduleNotificationAsync as jest.Mock).mock
-        .calls[0][0];
+      const call = (Notifications.scheduleNotificationAsync as jest.Mock).mock.calls[0][0];
       expect(call.content.title).toContain('Water Reminder Test');
       expect(call.content.data.type).toBe('sound-test');
-      expect(call.content.data.soundId).toBe('water-bubble');
+      expect(call.content.data.soundId).toBe('popping-bubble');
     });
 
     it('should send test notification in Myanmar', async () => {
-      const result = await sendTestNotificationWithSound('liquid-bubble', 'my');
+      const result = await sendTestNotificationWithSound('popping-bubble', 'my');
 
       expect(result).toBe(true);
-      const call = (Notifications.scheduleNotificationAsync as jest.Mock).mock
-        .calls[0][0];
+      const call = (Notifications.scheduleNotificationAsync as jest.Mock).mock.calls[0][0];
       expect(call.content.title).toContain('ရေသောက်သတိပေးစမ်းသပ်မှု');
     });
 
     it('should use saved sound when no soundId provided', async () => {
-      storedData['@hydromate_notification_sound'] = 'liquid-bubble';
+      storedData['@hydromate_notification_sound'] = 'popping-bubble';
 
       const result = await sendTestNotificationWithSound(undefined, 'en');
 
       expect(result).toBe(true);
-      const call = (Notifications.scheduleNotificationAsync as jest.Mock).mock
-        .calls[0][0];
-      expect(call.content.data.soundId).toBe('liquid-bubble');
+      const call = (Notifications.scheduleNotificationAsync as jest.Mock).mock.calls[0][0];
+      expect(call.content.data.soundId).toBe('popping-bubble');
     });
 
     it('should not include sound for silent option', async () => {
       const result = await sendTestNotificationWithSound('silent', 'en');
 
       expect(result).toBe(true);
-      const call = (Notifications.scheduleNotificationAsync as jest.Mock).mock
-        .calls[0][0];
+      const call = (Notifications.scheduleNotificationAsync as jest.Mock).mock.calls[0][0];
       expect(call.content.sound).toBeUndefined();
     });
 
@@ -239,7 +220,7 @@ describe('Notification Sounds Service', () => {
         new Error('Notification error')
       );
 
-      const result = await sendTestNotificationWithSound('water-bubble', 'en');
+      const result = await sendTestNotificationWithSound('popping-bubble', 'en');
 
       expect(result).toBe(false);
     });
@@ -247,7 +228,7 @@ describe('Notification Sounds Service', () => {
 
   describe('initializeNotificationSounds', () => {
     it('should update notification channel with saved sound', async () => {
-      storedData['@hydromate_notification_sound'] = 'water-bubble';
+      storedData['@hydromate_notification_sound'] = 'popping-bubble';
 
       await initializeNotificationSounds();
 
@@ -267,18 +248,12 @@ describe('Notification Sounds Service', () => {
   });
 
   describe('Sound option properties', () => {
-    it('should have correct properties for water-bubble', () => {
-      const option = getSoundOption('water-bubble');
+    it('should have correct properties for popping-bubble', () => {
+      const option = getSoundOption('popping-bubble');
 
-      expect(option?.id).toBe('water-bubble');
-      expect(option?.androidSound).toBe('water_bubble');
+      expect(option?.id).toBe('popping-bubble');
+      expect(option?.androidSound).toBe('popping_bubble');
       expect(option?.isPremium).toBe(false);
-    });
-
-    it('should have null androidSound for default', () => {
-      const option = getSoundOption('default');
-
-      expect(option?.androidSound).toBeNull();
     });
 
     it('should have null androidSound for silent', () => {
@@ -287,13 +262,9 @@ describe('Notification Sounds Service', () => {
       expect(option?.androidSound).toBeNull();
     });
 
-    it('should have androidSound for custom sounds', () => {
-      const customSounds: NotificationSoundId[] = ['water-bubble', 'liquid-bubble'];
-
-      customSounds.forEach((soundId) => {
-        const option = getSoundOption(soundId);
-        expect(option?.androidSound).toBeTruthy();
-      });
+    it('should have androidSound for popping-bubble', () => {
+      const option = getSoundOption('popping-bubble');
+      expect(option?.androidSound).toBe('popping_bubble');
     });
   });
 });

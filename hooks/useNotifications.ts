@@ -1,17 +1,9 @@
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Note: Notification handler is set in services/smartNotifications.ts
+// to avoid duplicate handler registration
 
 export const useNotifications = () => {
   const [expoPushToken, setExpoPushToken] = useState<string>('');
@@ -48,14 +40,8 @@ export const useNotifications = () => {
 export const registerForPushNotificationsAsync = async (): Promise<string | undefined> => {
   let token: string | undefined;
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#4A90D9',
-    });
-  }
+  // Note: Notification channel is created in services/notificationSounds.ts
+  // with custom sound support to avoid duplicate channel creation
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -80,7 +66,7 @@ export const registerForPushNotificationsAsync = async (): Promise<string | unde
 
 export const scheduleWaterReminder = async (intervalMinutes: number = 60) => {
   await Notifications.cancelAllScheduledNotificationsAsync();
-  
+
   await Notifications.scheduleNotificationAsync({
     content: {
       title: '💧 Time to drink water!',

@@ -6,6 +6,8 @@ const htoneRaiKhun = require('./htone-rai-khun.mp3');
 const rollingWave = require('./rolling-wave.mp3');
 const waterBubble = require('./water_bubble.wav');
 const liquidBubble = require('./liquid_bubble.wav');
+const poppingBubble = require('./popping_bubble.wav');
+const bigBubble = require('./big_bubble.wav');
 const rain = require('./Rain.mp3');
 const stream = require('./Stream.mp3');
 const thunderStorm = require('./Heavy-Thunderstorm.mp3');
@@ -20,20 +22,24 @@ export const SOUND_ASSETS: Record<string, number> = {
   'rolling-wave': rollingWave,
   'water-bubble': waterBubble,
   'liquid-bubble': liquidBubble,
-  'animal': animal,
-  'cricket': cricke,
-  'forest': forest,
-  'thunderstorm': thunderStorm,
-  'oceanSound': oceanSound,
-  'rain': rain,
-  'stream': stream,
-  'wind': wind,
+  'popping-bubble': poppingBubble,
+  'big-bubble': bigBubble,
+  animal: animal,
+  cricket: cricke,
+  forest: forest,
+  thunderstorm: thunderStorm,
+  oceanSound: oceanSound,
+  rain: rain,
+  stream: stream,
+  wind: wind,
 };
 
 // Notification sound assets
 export const NOTIFICATION_SOUND_ASSETS: Record<string, number> = {
   'water-bubble': waterBubble,
   'liquid-bubble': liquidBubble,
+  'popping-bubble': poppingBubble,
+  'big-bubble': bigBubble,
 };
 
 // Check if a local asset exists for a sound ID
