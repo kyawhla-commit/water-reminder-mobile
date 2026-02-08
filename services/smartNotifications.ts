@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { AccessibilityInfo, Platform } from 'react-native';
-import { getNotificationChannelId } from './notificationSounds';
+import {
+  getNotificationChannelId,
+  getNotificationSound,
+  getSoundOption,
+} from './notificationSounds';
 import { getLastNDays } from './waterHistory';
 
 const NOTIFICATION_SETTINGS_KEY = 'notification_settings';
@@ -586,6 +590,20 @@ export const setupNotificationChannel = async (): Promise<void> => {
       // Channel might not exist yet, ignore
     }
 
+    // Get user's saved sound preference
+    const savedSoundId = await getNotificationSound();
+    const soundOption = getSoundOption(savedSoundId);
+
+    // Determine sound value: use android sound name, or undefined for silent
+    let soundValue: string | undefined;
+    if (savedSoundId === 'silent') {
+      soundValue = undefined;
+    } else if (soundOption?.androidSound) {
+      soundValue = soundOption.androidSound;
+    } else {
+      soundValue = 'default';
+    }
+
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: 'Water Reminders',
       description: 'Hydration reminder notifications',
@@ -594,10 +612,12 @@ export const setupNotificationChannel = async (): Promise<void> => {
       lightColor: '#2196F3',
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       bypassDnd: false,
-      sound: 'default',
+      sound: soundValue,
       enableVibrate: true,
       enableLights: true,
     });
+
+    console.log(`✅ Notification channel setup with sound: ${soundValue || 'silent'}`);
   }
 };
 
@@ -654,6 +674,10 @@ export const scheduleSmartReminders = async (settings: NotificationSettings): Pr
           .slice(0, maxNotifications)
       : reminderTimes;
 
+  // Get sound preference for iOS
+  const savedSoundId = await getNotificationSound();
+  const soundOption = getSoundOption(savedSoundId);
+
   // Schedule notifications
   for (const { hour, minute } of limitedTimes) {
     const message = settings.motivationalMessages
@@ -661,18 +685,33 @@ export const scheduleSmartReminders = async (settings: NotificationSettings): Pr
       : { title: '💧 Water Reminder', body: 'Time to drink some water!' };
 
     try {
+      // Build notification content with proper sound handling
+      const notificationContent: Notifications.NotificationContentInput = {
+        title: message.title,
+        body: message.body,
+        vibrate: settings.vibrationEnabled ? [0, 250, 250, 250] : undefined,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        data: { type: 'reminder', hour, minute },
+      };
+
+      // Platform-specific sound handling
+      if (Platform.OS === 'android') {
+        // Android: sound is controlled by the notification channel, not content
+        // Just set the channelId, don't set sound in content
+        (notificationContent as any).channelId = getChannelId();
+      } else if (Platform.OS === 'ios') {
+        // iOS: sound is controlled by the content
+        if (!settings.soundEnabled || savedSoundId === 'silent') {
+          notificationContent.sound = false;
+        } else if (soundOption?.iosSound) {
+          notificationContent.sound = soundOption.iosSound;
+        } else {
+          notificationContent.sound = true; // Use default iOS sound
+        }
+      }
+
       await Notifications.scheduleNotificationAsync({
-        content: {
-          title: message.title,
-          body: message.body,
-          // On Android, sound is controlled by the notification channel
-          // On iOS, we can specify the sound here
-          sound: settings.soundEnabled,
-          vibrate: settings.vibrationEnabled ? [0, 250, 250, 250] : undefined,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          data: { type: 'reminder', hour, minute },
-          ...(Platform.OS === 'android' && { channelId: getChannelId() }),
-        },
+        content: notificationContent,
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
           hour,
@@ -720,16 +759,36 @@ export const sendImmediateNotification = async (
   if (!settings.enabled || isQuietHours(settings)) return null;
 
   try {
+    // Build notification content with proper sound handling
+    const notificationContent: Notifications.NotificationContentInput = {
+      title,
+      body,
+      vibrate: settings.vibrationEnabled ? [0, 250, 250, 250] : undefined,
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+      data: data || {},
+    };
+
+    // Platform-specific sound handling
+    if (Platform.OS === 'android') {
+      // Android: sound is controlled by the notification channel
+      (notificationContent as any).channelId = getChannelId();
+    } else if (Platform.OS === 'ios') {
+      // iOS: sound is controlled by the content
+      if (!settings.soundEnabled) {
+        notificationContent.sound = false;
+      } else {
+        const savedSoundId = await getNotificationSound();
+        if (savedSoundId === 'silent') {
+          notificationContent.sound = false;
+        } else {
+          const soundOption = getSoundOption(savedSoundId);
+          notificationContent.sound = soundOption?.iosSound || true;
+        }
+      }
+    }
+
     const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: settings.soundEnabled ? 'default' : undefined,
-        vibrate: settings.vibrationEnabled ? [0, 250, 250, 250] : undefined,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        data: data || {},
-        ...(Platform.OS === 'android' && { channelId: getChannelId() }),
-      },
+      content: notificationContent,
       trigger: null,
     });
     return id;
@@ -983,15 +1042,29 @@ export const sendTestNotification = async (language: 'en' | 'my' = 'en'): Promis
         ? 'သင့်အသိပေးချက်များ ကောင်းစွာအလုပ်လုပ်နေပါသည်။ ရေသောက်သတိပေးချက်များ ရရှိပါလိမ့်မည်!'
         : "Your notifications are working perfectly. You'll receive hydration reminders as scheduled!";
 
+    // Build notification content with proper sound handling
+    const notificationContent: Notifications.NotificationContentInput = {
+      title,
+      body,
+      vibrate: [0, 250, 250, 250],
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+    };
+
+    // Platform-specific sound handling
+    if (Platform.OS === 'android') {
+      (notificationContent as any).channelId = getChannelId();
+    } else if (Platform.OS === 'ios') {
+      const savedSoundId = await getNotificationSound();
+      if (savedSoundId === 'silent') {
+        notificationContent.sound = false;
+      } else {
+        const soundOption = getSoundOption(savedSoundId);
+        notificationContent.sound = soundOption?.iosSound || true;
+      }
+    }
+
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: 'default',
-        vibrate: [0, 250, 250, 250],
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        ...(Platform.OS === 'android' && { channelId: getChannelId() }),
-      },
+      content: notificationContent,
       trigger: null, // Immediate
     });
     return true;
@@ -1011,16 +1084,30 @@ export const sendTestPersonalizedNotification = async (
   try {
     const message = getPersonalizedMessage(userName, language);
 
+    // Build notification content with proper sound handling
+    const notificationContent: Notifications.NotificationContentInput = {
+      title: message.title,
+      body: message.body,
+      vibrate: [0, 250, 250, 250],
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+      data: { type: 'test-personalized', userName },
+    };
+
+    // Platform-specific sound handling
+    if (Platform.OS === 'android') {
+      (notificationContent as any).channelId = getChannelId();
+    } else if (Platform.OS === 'ios') {
+      const savedSoundId = await getNotificationSound();
+      if (savedSoundId === 'silent') {
+        notificationContent.sound = false;
+      } else {
+        const soundOption = getSoundOption(savedSoundId);
+        notificationContent.sound = soundOption?.iosSound || true;
+      }
+    }
+
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title: message.title,
-        body: message.body,
-        sound: 'default',
-        vibrate: [0, 250, 250, 250],
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        data: { type: 'test-personalized', userName },
-        ...(Platform.OS === 'android' && { channelId: getChannelId() }),
-      },
+      content: notificationContent,
       trigger: null,
     });
     return true;
@@ -1108,16 +1195,30 @@ export const sendTimeBasedTestNotification = async (): Promise<{
   const message = getMessageForTimePeriod(period);
 
   try {
+    // Build notification content with proper sound handling
+    const notificationContent: Notifications.NotificationContentInput = {
+      title: message.title,
+      body: message.body,
+      vibrate: [0, 250, 250, 250],
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+      data: { type: 'test', period },
+    };
+
+    // Platform-specific sound handling
+    if (Platform.OS === 'android') {
+      (notificationContent as any).channelId = getChannelId();
+    } else if (Platform.OS === 'ios') {
+      const savedSoundId = await getNotificationSound();
+      if (savedSoundId === 'silent') {
+        notificationContent.sound = false;
+      } else {
+        const soundOption = getSoundOption(savedSoundId);
+        notificationContent.sound = soundOption?.iosSound || true;
+      }
+    }
+
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title: message.title,
-        body: message.body,
-        sound: 'default',
-        vibrate: [0, 250, 250, 250],
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        data: { type: 'test', period },
-        ...(Platform.OS === 'android' && { channelId: getChannelId() }),
-      },
+      content: notificationContent,
       trigger: null,
     });
     return { success: true, period, message };
@@ -1136,16 +1237,30 @@ export const sendPeriodTestNotification = async (
   const message = getMessageForTimePeriod(period);
 
   try {
+    // Build notification content with proper sound handling
+    const notificationContent: Notifications.NotificationContentInput = {
+      title: message.title,
+      body: message.body,
+      vibrate: [0, 250, 250, 250],
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+      data: { type: 'test', period },
+    };
+
+    // Platform-specific sound handling
+    if (Platform.OS === 'android') {
+      (notificationContent as any).channelId = getChannelId();
+    } else if (Platform.OS === 'ios') {
+      const savedSoundId = await getNotificationSound();
+      if (savedSoundId === 'silent') {
+        notificationContent.sound = false;
+      } else {
+        const soundOption = getSoundOption(savedSoundId);
+        notificationContent.sound = soundOption?.iosSound || true;
+      }
+    }
+
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title: message.title,
-        body: message.body,
-        sound: 'default',
-        vibrate: [0, 250, 250, 250],
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        data: { type: 'test', period },
-        ...(Platform.OS === 'android' && { channelId: getChannelId() }),
-      },
+      content: notificationContent,
       trigger: null,
     });
     return true;
@@ -1276,16 +1391,36 @@ export const sendTestNotificationWithOptions = async (options: {
       : `Sound: ${options.sound ? 'ON' : 'OFF'} | Vibration: ${options.vibration ? 'ON' : 'OFF'}`;
 
   try {
+    // Build notification content with proper sound handling
+    const notificationContent: Notifications.NotificationContentInput = {
+      title: options.title || defaultTitle,
+      body: options.body || defaultBody,
+      vibrate: options.vibration ? [0, 250, 250, 250] : undefined,
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+      data: { type: 'test', sound: options.sound, vibration: options.vibration },
+    };
+
+    // Platform-specific sound handling
+    if (Platform.OS === 'android') {
+      (notificationContent as any).channelId = getChannelId();
+      // Note: Android sound is controlled by channel, so if user wants sound,
+      // we use the channel which has the user's preferred sound configured
+    } else if (Platform.OS === 'ios') {
+      if (options.sound) {
+        const savedSoundId = await getNotificationSound();
+        if (savedSoundId === 'silent') {
+          notificationContent.sound = false;
+        } else {
+          const soundOption = getSoundOption(savedSoundId);
+          notificationContent.sound = soundOption?.iosSound || true;
+        }
+      } else {
+        notificationContent.sound = false;
+      }
+    }
+
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title: options.title || defaultTitle,
-        body: options.body || defaultBody,
-        sound: options.sound ? 'default' : undefined,
-        vibrate: options.vibration ? [0, 250, 250, 250] : undefined,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        data: { type: 'test', sound: options.sound, vibration: options.vibration },
-        ...(Platform.OS === 'android' && { channelId: getChannelId() }),
-      },
+      content: notificationContent,
       trigger: null,
     });
     return true;

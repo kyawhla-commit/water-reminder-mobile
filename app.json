@@ -12,7 +12,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.kyawhla.hydromate",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": [
+          "audio"
+        ],
         "NSMicrophoneUsageDescription": "This app does not use the microphone."
       }
     },
@@ -51,7 +53,7 @@
           "icon": "./assets/images/icon.png",
           "color": "#2196F3",
           "sounds": ["./assets/sounds/popping_bubble.wav"],
-          "defaultChannel": "hydromate-reminders"
+          "defaultChannel": "hydromate-water-reminders"
         }
       ],
       [
